@@ -11,22 +11,6 @@ import h5py
 import random
 from shutil import copyfile
 
-class TextLogger():
-    def __init__(self, title, save_path, append=False):
-        print(save_path)
-        file_state = 'wb'
-        if append:
-            file_state = 'ab'
-        self.file = open(save_path, file_state, 0)
-        self.log(title)
-    
-    def log(self, strdata):
-        outstr = strdata + '\n'
-        outstr = outstr.encode("utf-8")
-        self.file.write(outstr)
-
-    def __del__(self):
-        self.file.close()
 
 train_transform = t.Compose([
     #t.Resize((108, 108)),
@@ -44,17 +28,39 @@ train_transform = t.Compose([
         contrast=0.4),
     t.ToTensor(),
     ])
+
 test_transform = t.Compose([
     t.Resize((96, 96)),
     #t.Resize((224, 224)),
     t.ToTensor(),
     ])
 
+
+
+class TextLogger():
+    def __init__(self, title, save_path, append=False):
+        print(save_path)
+        file_state = 'wb'
+        if append:
+            file_state = 'ab'
+        self.file = open(save_path, file_state, 0)
+        self.log(title)
+    
+    def log(self, strdata):
+        outstr = strdata + '\n'
+        outstr = outstr.encode("utf-8")
+        self.file.write(outstr)
+
+    def __del__(self):
+        self.file.close()
+
+
 class ImageDataset_hdf5(data.Dataset):
     def __init__(self, dataset_path, train):
 
         self.train = train
 
+        #creates list for each of the provided datasets
         target = dataset_path#'/mnt/datasets/pcam/'
         train_x_path = 'camelyonpatch_level_2_split_train_x.h5'
         train_y_path = 'camelyonpatch_level_2_split_train_y.h5'
@@ -64,12 +70,13 @@ class ImageDataset_hdf5(data.Dataset):
         test_y_path = 'camelyonpatch_level_2_split_test_y.h5'
 
 
-        if self.train == True:
+        if self.train == True: #if this is for training
             self.transform = train_transform
             #self.dataset_path = 'train_img_%05d'
             self.h5_file_x = target + train_x_path#'../../dataset/pcam/camelyonpatch_level_2_split_train_x.h5'
             self.h5_file_y = target + train_y_path#'../../dataset/pcam/camelyonpatch_level_2_split_train_y.h5'
-        else:
+
+        else: #if this is for testing
             self.transform = test_transform
             #self.dataset_path = 'test_img_%05d'
             self.h5_file_x = target + test_x_path#'../../dataset/pcam/camelyonpatch_level_2_split_test_x.h5'
@@ -78,9 +85,9 @@ class ImageDataset_hdf5(data.Dataset):
             #self.h5_file_y = target + valid_y_path#'../../dataset/pcam/camelyonpatch_level_2_split_valid_y.h5'
 
         y_f = h5py.File(self.h5_file_y, 'r')
-        self.label = torch.Tensor(y_f['y']).squeeze()
+        self.label = torch.Tensor(y_f['y']).squeeze() #make the y values into a tensor
         self.random_ixs = list(range(len(self.label)))
-        random.shuffle(self.random_ixs)
+        random.shuffle(self.random_ixs) #shuffles the y values
         y_f.close()
 
         pil2tensor = t.ToTensor()

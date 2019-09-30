@@ -29,17 +29,18 @@ parser.add_argument('--tqdm_off', action='store_true', default=False)
 parser.add_argument('--dataset_path', type=str, default='/mnt/datasets/pcam/')
 
 
-args = parser.parse_args()
-save_path = 'results/%s' % (args.dataset)
+args = parser.parse_args() #pull out arguments from parser
+save_path = 'results/%s' % (args.dataset) #Dataset path
+
 save_path = save_path + '/' + args.model
 
-if not os.path.exists(save_path):
+if not os.path.exists(save_path): #if the save path doesn't exist, make a new directory
     os.makedirs(save_path)
 
-torch.manual_seed(args.seed)
+torch.manual_seed(args.seed) #seeds the random number generator
 torch.cuda.manual_seed_all(args.seed)
 
-if args.tqdm_off:
+if args.tqdm_off: #disables tqdm from within application code
     def nop(it, *a, **k):
         return it
     tqdm = nop
@@ -121,10 +122,13 @@ def test():
 
     return acc
 
+### THIS IS WHERE THE CODE STARTS
+
 if not args.is_test:
     train_data_loader = torch.utils.data.DataLoader(dataset(dataset_path=args.dataset_path, train=True), batch_size=args.batch_size, shuffle=True, num_workers=4)
 
 test_data_loader = torch.utils.data.DataLoader(dataset(dataset_path=args.dataset_path, train=False), batch_size=args.batch_size, num_workers=4)
+
 
 class Model(nn.Module):
     def __init__(self, num_classes):
