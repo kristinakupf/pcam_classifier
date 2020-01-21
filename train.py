@@ -11,14 +11,15 @@ import argparse
 from torchvision import datasets
 import time
 import random
+import numpy as np
 import math
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--is_test', action='store_true', default=False)
-parser.add_argument('--max_epochs', type=int, default=10)
+parser.add_argument('--max_epochs', type=int, default=2)
 parser.add_argument('--dataset', type=str, default='pcam', help='dataset')
 parser.add_argument('--seed', type=int, default=1111)
-parser.add_argument('--model', choices=['base'], default='base')
+parser.add_argument('--model', choices=['resnet34'], default='resnet34')
 parser.add_argument('--batch_size', type=int, default=128)
 parser.add_argument('--lr', type=float, default=1e-4)
 parser.add_argument('--lr_steps', default=[5], nargs='+', type=int)
@@ -36,8 +37,13 @@ save_path = save_path + '/' + args.model
 if not os.path.exists(save_path):
     os.makedirs(save_path)
 
+#Set all random seeds
 torch.manual_seed(args.seed)
 torch.cuda.manual_seed_all(args.seed)
+random.seed(args.seed)
+np.random.seed(args.seed)
+
+
 
 if args.tqdm_off:
     def nop(it, *a, **k):
@@ -122,14 +128,17 @@ def test():
     return acc
 
 if not args.is_test:
-    train_data_loader = torch.utils.data.DataLoader(dataset(dataset_path=args.dataset_path, train=True), batch_size=args.batch_size, shuffle=True, num_workers=4)
+    train_data_loader = torch.utils.data.DataLoader(dataset(dataset_path=args.dataset_path, train=True, is_test=False), batch_size=args.batch_size, shuffle=True, num_workers=4)
+    test_data_loader = torch.utils.data.DataLoader(dataset(dataset_path=args.dataset_path, train=False, is_test=False), batch_size=args.batch_size, num_workers=4)
 
-test_data_loader = torch.utils.data.DataLoader(dataset(dataset_path=args.dataset_path, train=False), batch_size=args.batch_size, num_workers=4)
+else:
+    test_data_loader = torch.utils.data.DataLoader(dataset(dataset_path=args.dataset_path, train=False, is_test=True), batch_size=args.batch_size, num_workers=4)
+
 
 class Model(nn.Module):
     def __init__(self, num_classes):
         super(Model, self).__init__()
-        base = models.__dict__['resnet34']()
+        base = models.__dict__['resnet34'](pretrained=True)
         self.base = nn.Sequential(*list(base.children())[:-1])
         self.fc1 = nn.Linear(512, num_classes)
 

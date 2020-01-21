@@ -51,9 +51,10 @@ test_transform = t.Compose([
     ])
 
 class ImageDataset_hdf5(data.Dataset):
-    def __init__(self, dataset_path, train):
+    def __init__(self, dataset_path, train, is_test):
 
         self.train = train
+        self.is_test = is_test
 
         target = dataset_path#'/mnt/datasets/pcam/'
         train_x_path = 'camelyonpatch_level_2_split_train_x.h5'
@@ -66,16 +67,21 @@ class ImageDataset_hdf5(data.Dataset):
 
         if self.train == True:
             self.transform = train_transform
-            #self.dataset_path = 'train_img_%05d'
+            print('using training data')
             self.h5_file_x = target + train_x_path#'../../dataset/pcam/camelyonpatch_level_2_split_train_x.h5'
             self.h5_file_y = target + train_y_path#'../../dataset/pcam/camelyonpatch_level_2_split_train_y.h5'
         else:
-            self.transform = test_transform
-            #self.dataset_path = 'test_img_%05d'
-            self.h5_file_x = target + test_x_path#'../../dataset/pcam/camelyonpatch_level_2_split_test_x.h5'
-            self.h5_file_y = target + test_y_path#'../../dataset/pcam/camelyonpatch_level_2_split_test_y.h5'
-            #self.h5_file_x = target + valid_x_path#'../../dataset/pcam/camelyonpatch_level_2_split_valid_x.h5'
-            #self.h5_file_y = target + valid_y_path#'../../dataset/pcam/camelyonpatch_level_2_split_valid_y.h5'
+            if self.is_test==False:
+                self.transform = test_transform
+                print('using validation data')
+                self.h5_file_x = target + valid_x_path  # '../../dataset/pcam/camelyonpatch_level_2_split_valid_x.h5'
+                self.h5_file_y = target + valid_y_path  # '../../dataset/pcam/camelyonpatch_level_2_split_valid_y.h5'
+            else:
+                self.transform = test_transform
+                print('using test data')
+                self.h5_file_x = target + test_x_path#'../../dataset/pcam/camelyonpatch_level_2_split_test_x.h5'
+                self.h5_file_y = target + test_y_path#'../../dataset/pcam/camelyonpatch_level_2_split_test_y.h5'
+
 
         y_f = h5py.File(self.h5_file_y, 'r')
         self.label = torch.Tensor(y_f['y']).squeeze()
