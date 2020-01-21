@@ -15,7 +15,7 @@ import numpy as np
 import math
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--is_test', action='store_true', default=False)
+parser.add_argument('--mode', choices=['train', 'test'], default='train')
 parser.add_argument('--max_epochs', type=int, default=2)
 parser.add_argument('--dataset', type=str, default='pcam', help='dataset')
 parser.add_argument('--seed', type=int, default=1111)
@@ -127,7 +127,7 @@ def test():
 
     return acc
 
-if not args.is_test:
+if not args.mode == 'test':
     train_data_loader = torch.utils.data.DataLoader(dataset(dataset_path=args.dataset_path, train=True, is_test=False), batch_size=args.batch_size, shuffle=True, num_workers=4)
     test_data_loader = torch.utils.data.DataLoader(dataset(dataset_path=args.dataset_path, train=False, is_test=False), batch_size=args.batch_size, num_workers=4)
 
@@ -157,7 +157,7 @@ sch = lr_scheduler.MultiStepLR(opt, milestones=args.lr_steps, gamma=0.1)
 if not os.path.exists(save_path):
     os.makedirs(save_path)
 
-if not args.is_test:
+if not args.mode=='test':
     loss_logger = utils.TextLogger('loss', '{}/loss_{}.log'.format(save_path, args.seed))
     acc_logger = utils.TextLogger('acc', '{}/acc_{}.log'.format(save_path, args.seed))
     test_acc_logger = utils.TextLogger('test_acc', '{}/test_acc_{}.log'.format(save_path, args.seed))
@@ -168,7 +168,7 @@ if args.load_epoch != -1:
     epoch = args.load_epoch + 1
     load_checkpoint('%s/checkpoint_%d_%d.pth' % (save_path, args.seed, args.load_epoch))
    
-if not args.is_test:
+if not args.mode=='test':
     best_acc = 0
     while True:
         loss = train()
