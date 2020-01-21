@@ -17,7 +17,7 @@ import numpy as np
 import math
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--mode', choices=['pretrain','train', 'test'], default='train')
+parser.add_argument('--mode', choices=['pretrain','supervised', 'test'], default='train')
 parser.add_argument('--init_cond', choices=['rotation', 'imagenet', 'random'], default='random')
 parser.add_argument('--max_epochs', type=int, default=2)
 parser.add_argument('--dataset', type=str, default='pcam', help='dataset')
@@ -34,11 +34,6 @@ parser.add_argument('--dataset_path', type=str, default='/mnt/datasets/pcam/')
 
 
 args = parser.parse_args()
-save_path = 'results/%s' % (args.dataset)
-save_path = save_path + '/' + args.model + '/' + args.init_cond + '/' + datetime.datetime.now().strftime("%Y-%m-%d-%H-%M")
-
-if not os.path.exists(save_path):
-    os.makedirs(save_path)
 
 #Set all random seeds
 torch.manual_seed(args.seed)
@@ -59,10 +54,14 @@ dataset = utils.__dict__['ImageDataset_hdf5']
 def save_checkpoint():
     checkpoint = [model.state_dict(), opt.state_dict()]
     torch.save(checkpoint, '%s/checkpoint_%d_%d.pth' % (save_path, args.seed, epoch))
+    torch.save(checkpoint, '%s/checkpoint_%d_%d.pth' % (save_mostrecent, args.seed, epoch))
+
 
 def save_best_checkpoint():
     checkpoint = [model.state_dict(), opt.state_dict()]
-    torch.save(checkpoint, '%s/checkpoint_best_%d.pth' % (save_path, args.seed))   
+    torch.save(checkpoint, '%s/checkpoint_best_%d.pth' % (save_path, args.seed))
+    torch.save(checkpoint, '%s/checkpoint_best_%d.pth' % (save_mostrecent, args.seed))
+
 
 def load_checkpoint(load_path):
     checkpoint = torch.load(load_path)
@@ -148,6 +147,17 @@ def create_model():
 
 if __name__ == "__main__":
 
+    #set up directory to save files
+    save_pathroot = 'results/%s' % (args.dataset)
+    save_path = save_pathroot + '/' + args.model + '/' + args.init_cond + '/' + datetime.datetime.now().strftime(
+        "%Y-%m-%d-%H-%M")
+    save_mostrecent = save_pathroot + '/' + args.model + '/' + args.init_cond + '/mostrecent'
+
+    if not os.path.exists(save_path):
+        os.makedirs(save_path)
+        if not os.path.exists(save_mostrecent):
+            os.makedirs(save_mostrecent)
+
     #Load in data for training/validation or testing
     if not args.mode == 'test':
         train_data_loader = torch.utils.data.DataLoader(dataset(dataset_path=args.dataset_path, train=True, is_test=False), batch_size=args.batch_size, shuffle=True, num_workers=4)
@@ -156,18 +166,19 @@ if __name__ == "__main__":
     else:
         test_data_loader = torch.utils.data.DataLoader(dataset(dataset_path=args.dataset_path, train=False, is_test=True), batch_size=args.batch_size, num_workers=4)
 
-    model, opt, sch = create_model()
 
-    if not os.path.exists(save_path):
-        os.makedirs(save_path)
+    #Create the model
+    model, opt, sch = create_model()
 
     if not args.mode=='test':
         loss_logger = utils.TextLogger('loss', '{}/loss_{}.log'.format(save_path, args.seed))
         acc_logger = utils.TextLogger('acc', '{}/acc_{}.log'.format(save_path, args.seed))
         test_acc_logger = utils.TextLogger('test_acc', '{}/test_acc_{}.log'.format(save_path, args.seed))
 
+
     ent_loss = nn.CrossEntropyLoss().cuda()
     epoch = 1
+
     if args.load_epoch != -1:
         epoch = args.load_epoch + 1
         load_checkpoint('%s/checkpoint_%d_%d.pth' % (save_path, args.seed, args.load_epoch))
