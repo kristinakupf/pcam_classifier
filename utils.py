@@ -139,7 +139,8 @@ class ImageDataset_hdf5(data.Dataset):
         return img, target
 
     def __len__(self):
-        return len(self.label)
+        # return len(self.label)
+        return 100
 
 
 if __name__ == '__main__':

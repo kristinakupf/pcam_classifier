@@ -5,9 +5,11 @@ import torchvision.models as models
 from torch import optim
 from torch.optim import lr_scheduler
 import utils
+import Network
 from tqdm import tqdm
 import os
 import argparse
+import datetime
 from torchvision import datasets
 import time
 import random
@@ -15,7 +17,8 @@ import numpy as np
 import math
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--mode', choices=['train', 'test'], default='train')
+parser.add_argument('--mode', choices=['pretrain','train', 'test'], default='train')
+parser.add_argument('--init_cond', choices=['rotation', 'imagenet', 'random'], default='random')
 parser.add_argument('--max_epochs', type=int, default=2)
 parser.add_argument('--dataset', type=str, default='pcam', help='dataset')
 parser.add_argument('--seed', type=int, default=1111)
@@ -32,7 +35,7 @@ parser.add_argument('--dataset_path', type=str, default='/mnt/datasets/pcam/')
 
 args = parser.parse_args()
 save_path = 'results/%s' % (args.dataset)
-save_path = save_path + '/' + args.model
+save_path = save_path + '/' + args.model + '/' + args.init_cond + '/' + datetime.datetime.now().strftime("%Y-%m-%d-%H-%M")
 
 if not os.path.exists(save_path):
     os.makedirs(save_path)
@@ -127,68 +130,69 @@ def test():
 
     return acc
 
-if not args.mode == 'test':
-    train_data_loader = torch.utils.data.DataLoader(dataset(dataset_path=args.dataset_path, train=True, is_test=False), batch_size=args.batch_size, shuffle=True, num_workers=4)
-    test_data_loader = torch.utils.data.DataLoader(dataset(dataset_path=args.dataset_path, train=False, is_test=False), batch_size=args.batch_size, num_workers=4)
+def create_model():
+    # Create a model with a specific initialization
+    if args.init_cond == 'imagenet':
+        Model = Network.__dict__['Model_ImageNet']
+    if args.init_cond == 'random':
+        Model = Network.__dict__['Model_Random']
 
-else:
-    test_data_loader = torch.utils.data.DataLoader(dataset(dataset_path=args.dataset_path, train=False, is_test=True), batch_size=args.batch_size, num_workers=4)
+    # if args.init_cond == 'selfsup':
+    #     Model = Network.__dict__['Model_SelfSupervised']
+
+    model = Model(num_classes=2)
+    model = model.cuda()
+    opt = optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.wd)
+    sch = lr_scheduler.MultiStepLR(opt, milestones=args.lr_steps, gamma=0.1)
+    return model, opt, sch
+
+if __name__ == "__main__":
+
+    #Load in data for training/validation or testing
+    if not args.mode == 'test':
+        train_data_loader = torch.utils.data.DataLoader(dataset(dataset_path=args.dataset_path, train=True, is_test=False), batch_size=args.batch_size, shuffle=True, num_workers=4)
+        test_data_loader = torch.utils.data.DataLoader(dataset(dataset_path=args.dataset_path, train=False, is_test=False), batch_size=args.batch_size, num_workers=4)
+
+    else:
+        test_data_loader = torch.utils.data.DataLoader(dataset(dataset_path=args.dataset_path, train=False, is_test=True), batch_size=args.batch_size, num_workers=4)
+
+    model, opt, sch = create_model()
+
+    if not os.path.exists(save_path):
+        os.makedirs(save_path)
+
+    if not args.mode=='test':
+        loss_logger = utils.TextLogger('loss', '{}/loss_{}.log'.format(save_path, args.seed))
+        acc_logger = utils.TextLogger('acc', '{}/acc_{}.log'.format(save_path, args.seed))
+        test_acc_logger = utils.TextLogger('test_acc', '{}/test_acc_{}.log'.format(save_path, args.seed))
+
+    ent_loss = nn.CrossEntropyLoss().cuda()
+    epoch = 1
+    if args.load_epoch != -1:
+        epoch = args.load_epoch + 1
+        load_checkpoint('%s/checkpoint_%d_%d.pth' % (save_path, args.seed, args.load_epoch))
+
+    if not args.mode=='test':
+        best_acc = 0
+        while True:
+            loss = train()
+            print(opt.param_groups[0]['lr'])
+            sch.step(epoch)
+            acc = test()
+
+            test_acc_logger.log(str(acc))
 
 
-class Model(nn.Module):
-    def __init__(self, num_classes):
-        super(Model, self).__init__()
-        base = models.__dict__['resnet34'](pretrained=True)
-        self.base = nn.Sequential(*list(base.children())[:-1])
-        self.fc1 = nn.Linear(512, num_classes)
+            if epoch % args.save_epoch == 0:
+                save_checkpoint()
+            if acc > best_acc:
+                best_acc = acc
+                save_best_checkpoint()
 
-    def forward(self, input):
-        feat = self.base(input).squeeze()
-        output = self.fc1(feat)
-        return output
+            if epoch == args.max_epochs:
+                break
 
-model = Model(num_classes=2)
-model = model.cuda()
-
-opt = optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.wd)
-
-sch = lr_scheduler.MultiStepLR(opt, milestones=args.lr_steps, gamma=0.1) 
-
-if not os.path.exists(save_path):
-    os.makedirs(save_path)
-
-if not args.mode=='test':
-    loss_logger = utils.TextLogger('loss', '{}/loss_{}.log'.format(save_path, args.seed))
-    acc_logger = utils.TextLogger('acc', '{}/acc_{}.log'.format(save_path, args.seed))
-    test_acc_logger = utils.TextLogger('test_acc', '{}/test_acc_{}.log'.format(save_path, args.seed))
-
-ent_loss = nn.CrossEntropyLoss().cuda()
-epoch = 1
-if args.load_epoch != -1:
-    epoch = args.load_epoch + 1
-    load_checkpoint('%s/checkpoint_%d_%d.pth' % (save_path, args.seed, args.load_epoch))
-   
-if not args.mode=='test':
-    best_acc = 0
-    while True:
-        loss = train()
-        print(opt.param_groups[0]['lr'])
-        sch.step(epoch)
-        acc = test()
-
-        test_acc_logger.log(str(acc))
-       
-
-        if epoch % args.save_epoch == 0:
-            save_checkpoint()
-        if acc > best_acc:
-            best_acc = acc
-            save_best_checkpoint()
-
-        if epoch == args.max_epochs:
-            break
-
-        epoch += 1
-else:
-    load_checkpoint('%s/checkpoint_%d_%d.pth' % (save_path, args.seed, args.max_epochs))
-    test()
+            epoch += 1
+    else:
+        load_checkpoint('%s/checkpoint_%d_%d.pth' % (save_path, args.seed, args.max_epochs))
+        test()
