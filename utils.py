@@ -31,7 +31,7 @@ class TextLogger():
 
 rot_transform = t.Compose([
     t.Resize((896, 896)),
-    t.CenterCrop(448),
+    t.RandomCrop(448),
     #t.Resize((108, 108)),
     #t.Pad(12, padding_mode='reflect'),
     # t.Resize((96, 96)),
@@ -50,7 +50,7 @@ rot_transform = t.Compose([
 
 train_transform = t.Compose([
     t.Resize((896, 896)),
-    t.CenterCrop(448),
+    t.RandomCrop(448),
     #t.Resize((108, 108)),
     #t.Pad(12, padding_mode='reflect'),
     # t.Resize((96, 96)),
@@ -58,7 +58,7 @@ train_transform = t.Compose([
     #t.RandomCrop(96),
     # t.RandomCrop(96),
     t.RandomHorizontalFlip(0.5),
-    t.RandomRotation([0, 360]),
+    # t.RandomRotation([0, 360]),
     t.ColorJitter(
         hue= 0.4,
         saturation=0.4,
@@ -68,7 +68,7 @@ train_transform = t.Compose([
     ])
 test_transform = t.Compose([
     t.Resize((896, 896)),
-    t.CenterCrop(448),
+    # t.CenterCrop(448),
     # t.Resize((96, 96)),
     #t.Resize((224, 224)),
     t.ToTensor(),
@@ -111,10 +111,10 @@ class ImageDataset_BACH(data.Dataset):
                 self.h5_file_y = target + test_y_path  # '../../dataset/pcam/camelyonpatch_level_2_split_test_y.h5'
 
         y_f = h5py.File(self.h5_file_y, 'r')
-        if self.is_test == True:
-            self.label = torch.Tensor(y_f['f']).squeeze()
-        else:
-            self.label = torch.Tensor(y_f['y']).squeeze()
+        # print(((y_f['f'][0])))
+        self.label = torch.Tensor(y_f['y']).squeeze()
+
+
         self.random_ixs = list(range(len(self.label)))
         random.shuffle(self.random_ixs)
         y_f.close()
